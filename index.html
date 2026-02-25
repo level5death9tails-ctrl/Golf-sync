@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Simple Golf Swing Sync (Offline)</title>
+
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Golf Sync">
+
+    <style>
+        body {
+            font-family: sans-serif;
+            background: #fff;
+            margin: 0;
+            padding: 0;
+            padding-bottom: 120px;
+        }
+
+        /* New Header for Offline App Input */
+        header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            border-bottom: 2px solid #ddd;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0 0 10px 0;
+            font-size: 22px;
+            color: #333;
+        }
+
+        .upload-container {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .upload-box {
+            background: white;
+            border: 1px dashed #ccc;
+            padding: 15px;
+            border-radius: 8px;
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .upload-box h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+            color: #444;
+        }
+
+        .upload-box input[type="file"] {
+            width: 100%;
+            font-size: 14px;
+        }
+
+        .video-wrapper {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+            gap: 10px;
+            background: #111;
+            padding: 10px;
+            box-sizing: border-box;
+            border-radius: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .vid-container {
+            width: 49%;
+            height: 40vh;
+            min-height: 250px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            overflow: hidden;
+            position: relative;
+            border-radius: 4px;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .overlay-wrapper {
+            margin-top: 15px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a1a;
+            padding: 15px;
+            box-sizing: border-box;
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        .overlay-container {
+            width: 100%;
+            max-width: 800px;
+            height: 60vh;
+            min-height: 300px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #000;
+            overflow: hidden;
+            position: relative;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            border: 2px solid #555;
+        }
+
+        .overlay-video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .overlay-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            width: 100%;
+            max-width: 800px;
+            margin-top: 15px;
+            background: #2b2b2b;
+            padding: 20px;
+            border-radius: 8px;
+            color: white;
+            justify-content: space-between;
+            box-sizing: border-box;
+            border: 1px solid #444;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            width: 48%;
+        }
+
+        .control-group label {
+            font-size: 13px;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #ccc;
+        }
+
+        .control-group input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            height: 12px;
+            border-radius: 6px;
+            background: #ddd;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        .control-group input[type=range]:hover {
+            background: #ccc;
+        }
+
+        .control-group input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: #ff4b4b;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            border: 2px solid white;
+        }
+
+        .time-badges {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            z-index: 10;
+            font-family: monospace;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        @media (max-width: 768px) {
+            .vid-container {
+                width: 100%;
+                height: 35vh;
+            }
+
+            .control-group {
+                width: 100%;
+            }
+        }
+    </style>
+    <style class="controls-css">
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 4px 6px;
+            background: #ffffff;
+            border-top: 1px solid #ddd;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            box-sizing: border-box;
+            z-index: 999999;
+            font-family: sans-serif;
+            gap: 4px;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+        }
+
+        .controls .row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 800px;
+            gap: 6px;
+            flex-wrap: nowrap;
+        }
+
+        .controls .vid-label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-right: 2px;
+            min-width: 32px;
+            text-align: center;
+        }
+
+        .controls .cell {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            background: #f4f5f7;
+            padding: 2px 4px;
+            border-radius: 4px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .controls .icon {
+            font-size: 12px;
+        }
+
+        .controls input[type="number"] {
+            width: 50px;
+            padding: 2px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 11px;
+            text-align: center;
+            margin: 0;
+        }
+
+        .controls button {
+            padding: 3px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            background: #ff4b4b;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .controls button.btn-small {
+            padding: 4px;
+            font-size: 10px;
+            background: #4a90e2;
+        }
+
+        .controls button.btn-reset {
+            background: #6c757d;
+        }
+
+        .controls select {
+            padding: 2px 4px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+            background: white;
+            margin: 0;
+        }
+
+        .controls input[type=range] {
+            flex: 1;
+            cursor: pointer;
+            height: 10px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            margin: 0;
+        }
+
+        .controls input[type=range]::-webkit-slider-thumb {
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #ff4b4b;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .controls .time-display {
+            font-family: monospace;
+            font-size: 13px;
+            font-weight: bold;
+            color: #333;
+            min-width: 50px;
+            text-align: right;
+            margin-left: 4px;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            .controls .row {
+                gap: 2px;
+                justify-content: space-between;
+            }
+
+            .controls .vid-label {
+                font-size: 12px;
+                min-width: 24px;
+            }
+
+            .controls .cell {
+                padding: 2px;
+                gap: 1px;
+                flex: 1;
+                justify-content: center;
+            }
+
+            .controls input[type="number"] {
+                width: 44px;
+                font-size: 10px;
+            }
+
+            .controls button.btn-small {
+                padding: 3px;
+                font-size: 9px;
+            }
+
+            .controls button {
+                padding: 4px 6px;
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>🏌️ シンプル2画面スイング比較 (Offline)</h1>
+        <div class="upload-container">
+            <div class="upload-box">
+                <h3>🎥 左動画 (基準)</h3>
+                <input type="file" id="upload1" accept="video/*">
+            </div>
+            <div class="upload-box">
+                <h3>🎥 右動画 (比較対象)</h3>
+                <input type="file" id="upload2" accept="video/*">
+                <br><br>
+                <label style="font-size: 14px;"><input type="checkbox" id="flipRightVideo"> 右動画を左右反転する</label>
+            </div>
+        </div>
+    </header>
+
+    <div class="video-wrapper">
+        <div class="vid-container">
+            <div class="time-badges" id="badge1">L: 0.00s</div>
+            <video id="vid1" muted playsinline webkit-playsinline preload="auto"></video>
+        </div>
+        <div class="vid-container">
+            <div class="time-badges" id="badge2">R: 0.00s</div>
+            <video id="vid2" muted playsinline webkit-playsinline preload="auto"></video>
+        </div>
+    </div>
+
+    <div class="overlay-wrapper">
+        <div class="overlay-container" id="overlayBox">
+            <canvas id="vid1_overlay" class="overlay-video"></canvas>
+            <canvas id="vid2_overlay" class="overlay-video" style="opacity: 0.5;"></canvas>
+        </div>
+        <div class="overlay-controls">
+            <div class="control-group">
+                <label>透過度 (Opacity): <span id="opVal">50%</span></label>
+                <input type="range" id="opSlider" min="0" max="100" value="50">
+            </div>
+            <div class="control-group">
+                <label>拡大・縮小 (Scale): <span id="scaleVal">1.0x</span></label>
+                <input type="range" id="scaleSlider" min="50" max="200" value="100">
+            </div>
+            <div class="control-group">
+                <label>X軸ズレ (Translate X): <span id="xVal">0px</span></label>
+                <input type="range" id="xSlider" min="-300" max="300" value="0">
+            </div>
+            <div class="control-group">
+                <label>Y軸ズレ (Translate Y): <span id="yVal">0px</span></label>
+                <input type="range" id="ySlider" min="-300" max="300" value="0">
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Master HTML Controls (4-Row Flattened Grid) -->
+    <div class="controls" translate="no">
+
+        <!-- ROW 1: Left Video -->
+        <div class="row">
+            <span class="vid-label">🎥L</span>
+            <div class="cell">
+                <span class="icon">🏁</span>
+                <input type="number" id="st1" value="0.00" step="0.05" min="0">
+                <button class="btn-small" id="set_st1">🎯</button>
+            </div>
+            <div class="cell">
+                <span class="icon">🛑</span>
+                <input type="number" id="et1" value="0.00" step="0.5" min="0">
+                <button class="btn-small" id="set_et1">🎯</button>
+            </div>
+            <div class="cell">
+                <span class="icon">🏃</span>
+                <input type="number" id="sp1" value="1.0" step="0.1" min="0.1" max="3.0">
+                <button class="btn-small btn-reset"
+                    onclick="document.getElementById('sp1').value=1.0; document.getElementById('sp1').dispatchEvent(new Event('input'))">↺</button>
+            </div>
+        </div>
+
+        <!-- ROW 2: Right Video -->
+        <div class="row">
+            <span class="vid-label">🎥R</span>
+            <div class="cell">
+                <span class="icon">🏁</span>
+                <input type="number" id="st2" value="0.00" step="0.05" min="0">
+                <button class="btn-small" id="set_st2">🎯</button>
+            </div>
+            <div class="cell">
+                <span class="icon">🛑</span>
+                <input type="number" id="et2" value="0.00" step="0.5" min="0">
+                <button class="btn-small" id="set_et2">🎯</button>
+            </div>
+            <div class="cell">
+                <span class="icon">🏃</span>
+                <input type="number" id="sp2" value="1.0" step="0.1" min="0.1" max="3.0">
+                <button class="btn-small btn-reset"
+                    onclick="document.getElementById('sp2').value=1.0; document.getElementById('sp2').dispatchEvent(new Event('input'))">↺</button>
+            </div>
+        </div>
+
+        <!-- ROW 3: Playback Actions -->
+        <div class="row" style="margin-top: 2px;">
+            <button id="playPauseBtn">⏯</button>
+            <button id="prevFrameBtn">⏪</button>
+            <button id="nextFrameBtn">⏩</button>
+            <div class="cell" style="padding: 2px 6px; background: transparent; border: none;">
+                <label
+                    style="font-size: 13px; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                    <input type="checkbox" id="loopCheck" checked style="margin:0; width: 14px; height: 14px;"> 🔁
+                </label>
+            </div>
+            <select id="masterSpeedSelect">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1.0" selected>1.0x</option>
+                <option value="2.0">2.0x</option>
+            </select>
+        </div>
+
+        <!-- ROW 4: Scrubber -->
+        <div class="row">
+            <input type="range" id="scrubber" min="0" max="1000" value="0" step="1">
+            <div class="time-display" id="timeStr">0.00s</div>
+        </div>
+
+    </div>
+
+    <!-- Logic Script -->
+    <script>
+        const v1 = document.getElementById('vid1');
+        const v2 = document.getElementById('vid2');
+        const scrubber = document.getElementById('scrubber');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const prevFrameBtn = document.getElementById('prevFrameBtn');
+        const nextFrameBtn = document.getElementById('nextFrameBtn');
+        const loopCheck = document.getElementById('loopCheck');
+        const masterSpeedSelect = document.getElementById('masterSpeedSelect');
+        const timeDisplay = document.getElementById('timeStr');
+        const badge1 = document.getElementById('badge1');
+        const badge2 = document.getElementById('badge2');
+
+        // Canvas Performance Boost
+        const canvas1 = document.getElementById('vid1_overlay');
+        const ctx1 = canvas1.getContext('2d');
+        const canvas2 = document.getElementById('vid2_overlay');
+        const ctx2 = canvas2.getContext('2d');
+
+        function renderCanvasLoop() {
+            if (v1.readyState >= 2 && v1.videoWidth > 0) {
+                if (canvas1.width !== v1.videoWidth) canvas1.width = v1.videoWidth;
+                if (canvas1.height !== v1.videoHeight) canvas1.height = v1.videoHeight;
+                ctx1.drawImage(v1, 0, 0, canvas1.width, canvas1.height);
+            }
+            if (v2.readyState >= 2 && v2.videoWidth > 0) {
+                if (canvas2.width !== v2.videoWidth) canvas2.width = v2.videoWidth;
+                if (canvas2.height !== v2.videoHeight) canvas2.height = v2.videoHeight;
+                ctx2.drawImage(v2, 0, 0, canvas2.width, canvas2.height);
+            }
+            requestAnimationFrame(renderCanvasLoop);
+        }
+        requestAnimationFrame(renderCanvasLoop);
+
+        let start1 = 0, end1 = 0, speed1 = 1.0;
+        let start2 = 0, end2 = 0, speed2 = 1.0;
+        let isPlaying = false;
+        let masterSpeed = 1.0;
+        let animationId;
+
+        // File Upload Listeners
+        const getBlobUrl = (fileElem) => {
+            const file = fileElem.files[0];
+            return file ? URL.createObjectURL(file) : null;
+        }
+
+        document.getElementById('upload1').addEventListener('change', (e) => {
+            const url = getBlobUrl(e.target);
+            if (url) {
+                v1.src = url;
+                v1.load();
+                recalculateDurations();
+            }
+        });
+
+        document.getElementById('upload2').addEventListener('change', (e) => {
+            const url = getBlobUrl(e.target);
+            if (url) {
+                v2.src = url;
+                v2.load();
+                recalculateDurations();
+            }
+        });
+
+        // Flip CSS toggle
+        const flipCb = document.getElementById('flipRightVideo');
+        flipCb.addEventListener('change', (e) => {
+            const scale = e.target.checked ? 'scaleX(-1)' : 'scaleX(1)';
+            v2.style.transform = scale;
+            updateOverlay();
+        });
+
+        // Read Inputs
+        const getVal = (id) => parseFloat(document.getElementById(id).value) || 0;
+
+        let masterDuration = 10;
+        function recalculateDurations() {
+            start1 = getVal('st1');
+            start2 = getVal('st2');
+            end1 = getVal('et1');
+            end2 = getVal('et2');
+            speed1 = getVal('sp1') || 1.0;
+            speed2 = getVal('sp2') || 1.0;
+
+            let d1 = (end1 > 0 ? end1 : (v1.duration || 10)) - start1;
+            let d2 = (end2 > 0 ? end2 : (v2.duration || 10)) - start2;
+            if (d1 < 0) d1 = 0.1;
+            if (d2 < 0) d2 = 0.1;
+
+            masterDuration = Math.max(d1 / speed1, d2 / speed2);
+            if (masterDuration === 0 || isNaN(masterDuration) || !isFinite(masterDuration)) masterDuration = 10;
+        }
+
+        const inputs = ['st1', 'st2', 'et1', 'et2', 'sp1', 'sp2'];
+        inputs.forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                recalculateDurations();
+                let pct = scrubber.value / 1000;
+                let ms = pct * masterDuration;
+                syncVideosToMaster(ms);
+            });
+        });
+
+        // "Set Current Position" logic
+        document.getElementById('set_st1').addEventListener('click', () => { document.getElementById('st1').value = v1.currentTime.toFixed(2); document.getElementById('st1').dispatchEvent(new Event('input')) });
+        document.getElementById('set_et1').addEventListener('click', () => { document.getElementById('et1').value = v1.currentTime.toFixed(2); document.getElementById('et1').dispatchEvent(new Event('input')) });
+        document.getElementById('set_st2').addEventListener('click', () => { document.getElementById('st2').value = v2.currentTime.toFixed(2); document.getElementById('st2').dispatchEvent(new Event('input')) });
+        document.getElementById('set_et2').addEventListener('click', () => { document.getElementById('et2').value = v2.currentTime.toFixed(2); document.getElementById('et2').dispatchEvent(new Event('input')) });
+
+        // Overlay Controls
+        const overlayBox = document.getElementById('overlayBox');
+        const opSlider = document.getElementById('opSlider');
+        const scaleSlider = document.getElementById('scaleSlider');
+        const xSlider = document.getElementById('xSlider');
+        const ySlider = document.getElementById('ySlider');
+
+        const opVal = document.getElementById('opVal');
+        const scaleVal = document.getElementById('scaleVal');
+        const xVal = document.getElementById('xVal');
+        const yVal = document.getElementById('yVal');
+
+        function updateOverlay() {
+            let opacity = opSlider.value / 100;
+            let scale = scaleSlider.value / 100;
+            let tx = xSlider.value;
+            let ty = ySlider.value;
+
+            opVal.innerText = opSlider.value + '%';
+            scaleVal.innerText = scale.toFixed(1) + 'x';
+            xVal.innerText = tx + 'px';
+            yVal.innerText = ty + 'px';
+
+            canvas2.style.opacity = opacity;
+
+            let flipTransform = flipCb.checked ? 'scaleX(-1)' : '';
+            canvas2.style.transform = `translate(${tx}px, ${ty}px) scale(${scale}) ${flipTransform}`;
+        }
+
+        opSlider.addEventListener('input', updateOverlay);
+        scaleSlider.addEventListener('input', updateOverlay);
+        xSlider.addEventListener('input', updateOverlay);
+        ySlider.addEventListener('input', updateOverlay);
+
+        function updateDisplay(masterTime) {
+            timeDisplay.innerHTML = `${masterTime.toFixed(2)}s`;
+            badge1.innerHTML = `L: ${v1.currentTime.toFixed(2)}s`;
+            badge2.innerHTML = `R: ${v2.currentTime.toFixed(2)}s`;
+        }
+
+        function syncVideosToMaster(masterTime) {
+            let t1 = (masterTime * speed1) + start1;
+            let t2 = (masterTime * speed2) + start2;
+
+            let _end1 = end1 > 0 ? end1 : (v1.duration || 9999);
+            let _end2 = end2 > 0 ? end2 : (v2.duration || 9999);
+
+            if (t1 > _end1) t1 = _end1;
+            if (t2 > _end2) t2 = _end2;
+
+            v1.playbackRate = masterSpeed * speed1;
+            v2.playbackRate = masterSpeed * speed2;
+
+            if (v1.readyState >= 1 && Math.abs(v1.currentTime - t1) > 0.1) { v1.currentTime = t1; }
+            if (v2.readyState >= 1 && Math.abs(v2.currentTime - t2) > 0.1) { v2.currentTime = t2; }
+
+            updateDisplay(masterTime);
+        }
+
+        masterSpeedSelect.addEventListener('change', (e) => {
+            masterSpeed = parseFloat(e.target.value);
+            v1.playbackRate = masterSpeed * speed1;
+            v2.playbackRate = masterSpeed * speed2;
+        });
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playPauseBtn.innerHTML = "⏸";
+                if (scrubber.value == 1000) { scrubber.value = 0; }
+                recalculateDurations();
+                let ms = (scrubber.value / 1000) * masterDuration;
+                syncVideosToMaster(ms);
+                v1.play().catch(e => { });
+                v2.play().catch(e => { });
+                animationId = requestAnimationFrame(updateLoop);
+            } else {
+                playPauseBtn.innerHTML = "⏯";
+                cancelAnimationFrame(animationId);
+                v1.pause();
+                v2.pause();
+            }
+        }
+
+        playPauseBtn.addEventListener('click', togglePlay);
+
+        scrubber.addEventListener('input', () => {
+            let ms = (scrubber.value / 1000) * masterDuration;
+            syncVideosToMaster(ms);
+        });
+
+        function stepFrame(framesToStep) {
+            if (isPlaying) togglePlay();
+            let masterTime = (scrubber.value / 1000) * masterDuration;
+            masterTime += (1 / 30) * framesToStep;
+            masterTime = Math.max(0, Math.min(masterTime, masterDuration));
+            scrubber.value = (masterTime / masterDuration) * 1000;
+            syncVideosToMaster(masterTime);
+        }
+
+        prevFrameBtn.addEventListener('click', () => stepFrame(-1));
+        nextFrameBtn.addEventListener('click', () => stepFrame(1));
+
+        function updateLoop() {
+            if (!isPlaying) return;
+
+            let m1 = -1, m2 = -1;
+            if (v1.readyState >= 1) {
+                let _e1 = end1 > 0 ? end1 : (v1.duration || 9999);
+                if (v1.currentTime >= _e1) { v1.pause(); m1 = (_e1 - start1) / speed1; }
+                else m1 = (v1.currentTime - start1) / speed1;
+            }
+            if (v2.readyState >= 1) {
+                let _e2 = end2 > 0 ? end2 : (v2.duration || 9999);
+                if (v2.currentTime >= _e2) { v2.pause(); m2 = (_e2 - start2) / speed2; }
+                else m2 = (v2.currentTime - start2) / speed2;
+            }
+
+            let currentMaster = Math.max(m1, m2);
+            if (currentMaster < 0) currentMaster = (scrubber.value / 1000) * masterDuration;
+
+            if (currentMaster >= masterDuration) {
+                if (loopCheck.checked) {
+                    scrubber.value = 0;
+                    syncVideosToMaster(0);
+                    v1.play().catch(e => { });
+                    v2.play().catch(e => { });
+                    animationId = requestAnimationFrame(updateLoop);
+                    return;
+                } else {
+                    currentMaster = masterDuration;
+                    isPlaying = false;
+                    v1.pause();
+                    v2.pause();
+                    scrubber.value = 1000;
+                    syncVideosToMaster(currentMaster);
+                    playPauseBtn.innerHTML = "⏯";
+                    return;
+                }
+            }
+
+            // Only drift correct if seriously desynced
+            let expectedT1 = (currentMaster * speed1) + start1;
+            if (v1.readyState >= 1 && !v1.paused && Math.abs(v1.currentTime - expectedT1) > 0.4) {
+                v1.currentTime = expectedT1;
+            }
+            let expectedT2 = (currentMaster * speed2) + start2;
+            if (v2.readyState >= 1 && !v2.paused && Math.abs(v2.currentTime - expectedT2) > 0.4) {
+                v2.currentTime = expectedT2;
+            }
+
+            scrubber.value = (currentMaster / masterDuration) * 1000;
+            updateDisplay(currentMaster);
+
+            animationId = requestAnimationFrame(updateLoop);
+        }
+
+        v1.addEventListener('loadedmetadata', recalculateDurations);
+        v2.addEventListener('loadedmetadata', recalculateDurations);
+
+        // Register Service Worker for PWA (Offline Mode)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('ServiceWorker registered'))
+                    .catch(err => console.log('ServiceWorker error', err));
+            });
+        }
+    </script>
+</body>
+
+</html>
